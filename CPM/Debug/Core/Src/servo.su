@@ -1,0 +1,4 @@
+../Core/Src/servo.c:24:6:RS485_MotorInit	16	static
+../Core/Src/servo.c:33:6:RS485_MotorEnable	8	static
+../Core/Src/servo.c:43:6:RS485_MotorDisable	8	static
+../Core/Src/servo.c:54:6:RS485_SendCommand	56	static

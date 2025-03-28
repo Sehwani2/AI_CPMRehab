@@ -1,0 +1,4 @@
+../Core/Src/servo.c:24:6:RS485_MotorInit	1
+../Core/Src/servo.c:33:6:RS485_MotorEnable	1
+../Core/Src/servo.c:43:6:RS485_MotorDisable	1
+../Core/Src/servo.c:54:6:RS485_SendCommand	1

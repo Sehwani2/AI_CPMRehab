@@ -1,0 +1,9 @@
+../Core/Src/ads1115.c:26:6:ADS1115_SetI2CHandle	1
+../Core/Src/ads1115.c:35:19:ADS1115_Init	2
+../Core/Src/ads1115.c:77:9:ADS1115_ReadADC	1
+../Core/Src/ads1115.c:115:9:ADS1115_ReadAveragedADC	1
+../Core/Src/ads1115.c:133:6:Calibrate_Zero	2
+../Core/Src/ads1115.c:154:6:Calibrate_Scale	2
+../Core/Src/ads1115.c:176:9:ADS1115_GetOffset	1
+../Core/Src/ads1115.c:180:7:ADS1115_GetScaleFactor	1
+../Core/Src/ads1115.c:184:6:ADS1115_IsCalibrated	1
