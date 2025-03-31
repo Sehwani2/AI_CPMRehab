@@ -63,10 +63,26 @@ float Encoder_GetAngle(void)
   float angle = (float)count_diff / (float)MAX_ENCODER_COUNT * 360.0f;
 
   // 부호에 따라 범위 조정
-  if (angle < 0)
-  {
-    angle += 360.0f;  // 360도 내로 값을 맞추기 위해 양수로 처리
-  }
+//  if (angle < 0)
+//  {
+//    angle += 360.0f;  // 360도 내로 값을 맞추기 위해 양수로 처리
+//  }
 
   return angle;
+}
+
+int Encoder_GetAngleInt(void)
+{
+    // float 타입의 각도 값 가져오기
+    float angle = Encoder_GetAngle();
+
+    // 반올림하여 정수로 변환 (0.5를 더해 소수점 반올림 효과)
+    int intAngle = (int)angle;
+
+    // 360도 범위 내로 유지 (0-359)
+    intAngle = intAngle % 360;
+    if (intAngle < 0)
+        intAngle += 360;
+
+    return intAngle;
 }

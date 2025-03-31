@@ -1,4 +1,5 @@
 ../Core/Src/encoder.c:24:6:Encoder_SetTimHandle	1
 ../Core/Src/encoder.c:33:6:Encoder_Init	1
 ../Core/Src/encoder.c:43:6:Encoder_Start	1
-../Core/Src/encoder.c:53:7:Encoder_GetAngle	2
+../Core/Src/encoder.c:53:7:Encoder_GetAngle	1
+../Core/Src/encoder.c:74:5:Encoder_GetAngleInt	2

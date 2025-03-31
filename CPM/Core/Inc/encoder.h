@@ -27,6 +27,7 @@ void Encoder_SetTimHandle(TIM_HandleTypeDef *htim);
 float Encoder_GetAngle(void);
 void Encoder_Start(void);
 void Encoder_Init(void);
+int Encoder_GetAngleInt(void);
 
 #ifdef __cplusplus
 }

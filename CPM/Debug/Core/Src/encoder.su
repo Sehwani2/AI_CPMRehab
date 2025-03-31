@@ -2,3 +2,4 @@
 ../Core/Src/encoder.c:33:6:Encoder_Init	4	static
 ../Core/Src/encoder.c:43:6:Encoder_Start	8	static
 ../Core/Src/encoder.c:53:7:Encoder_GetAngle	16	static
+../Core/Src/encoder.c:74:5:Encoder_GetAngleInt	16	static
