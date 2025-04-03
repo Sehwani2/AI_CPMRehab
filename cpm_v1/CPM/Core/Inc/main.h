@@ -57,10 +57,6 @@ void Error_Handler(void);
 /* USER CODE END EFP */
 
 /* Private defines -----------------------------------------------------------*/
-#define start_limit_Pin GPIO_PIN_10
-#define start_limit_GPIO_Port GPIOC
-#define end_limit_Pin GPIO_PIN_11
-#define end_limit_GPIO_Port GPIOC
 
 /* USER CODE BEGIN Private defines */
 
