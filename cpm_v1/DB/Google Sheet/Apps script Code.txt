@@ -1,0 +1,40 @@
+// 시트 가져오기 (0~)
+var sheetID = SpreadsheetApp.openById("1DkhICSczrXgDIL_AerZTG5Oe9-2pxTkNahWcSZwblb0");
+var stageNum = sheetID.getSheets()[0];  // 첫 번째 시트 가져오기
+
+// 데이터 업로드 함수
+function uploadCSVData(csvData) {
+  // 시트 초기화 (기존 데이터 삭제)
+  stageNum.clear();  // 시트의 모든 데이터를 지운다
+  
+  var data = JSON.parse(csvData);  // 파이썬에서 보내준 CSV 데이터
+  for (var i = 0; i < data.length; i++) {
+    var row = data[i];
+    stageNum.appendRow(row);  // 시트에 행 추가
+  }
+  return "데이터 업로드 완료";
+}
+
+// 최고값과 최소값을 구하는 함수
+function getMaxMinValues() {
+  var data = stageNum.getDataRange().getValues();  // 전체 데이터를 가져옴
+  var adcValues = data.slice(1).map(function(row) { return row[1]; });  // 데이터에서 ADC 값만 추출
+  var maxVal = Math.max.apply(null, adcValues);  // 최고값
+  var minVal = Math.min.apply(null, adcValues);  // 최소값
+  return { max: maxVal, min: minVal };  // 최고값과 최소값을 반환
+}
+
+function doPost(e) {
+  var data = e.postData.contents;  // 파이썬에서 보낸 데이터 받기
+  uploadCSVData(data);  // 데이터를 구글 시트에 업로드
+  return ContentService.createTextOutput("성공적으로 데이터가 업로드되었습니다.");
+}
+
+function doGet() {
+  var values = getMaxMinValues();  // 최고값과 최소값을 구하기
+  var result = {
+    max: values.max,
+    min: values.min
+  };
+  return ContentService.createTextOutput(JSON.stringify(result));  // JSON 형식으로 반환
+}
