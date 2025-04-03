@@ -94,3 +94,15 @@ int HX711_GetWeight(void) {
     filtered_weight = (filtered_weight * 85 + current_weight * 15) / 100;
     return filtered_weight;
 }
+
+float HX711_GetGrams(void) {
+    // Get a single raw reading from HX711
+    int32_t raw_value = HX711_ReadValue();
+    
+    // Convert to grams using the offset and scale factor
+    // Note: The original code multiplies by 1000.0f which seems to convert to milligrams,
+    // so we'll keep that to maintain consistency
+    float weight_grams = (float)(raw_value - offset) / scale_factor * 1000.0f;
+    
+    return weight_grams;
+}

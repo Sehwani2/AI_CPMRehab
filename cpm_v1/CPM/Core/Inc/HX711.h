@@ -16,6 +16,6 @@ void HX711_Tare(void);
 int HX711_GetWeight(void);
 void HX711_SetScale(float scale_factor);
 float HX711_GetUnits(uint8_t times);
-
+float HX711_GetGrams(void) ;
 
 #endif /* INC_HX711_H_ */

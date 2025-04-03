@@ -75,7 +75,8 @@ typedef struct {
 // 패시브 모드 서브 모드
 typedef enum {
   PASSIVE_ASSIST = 0,   // 서포트 모드 (도와주는 모드)
-  PASSIVE_RESIST,        // 저항 모드
+  PASSIVE_RESIST,
+  PASSIVE_PROPORTIONAL// 저항 모드
 } PassiveMode_t;
 
 // 패시브 모드 파라미터
@@ -98,7 +99,7 @@ typedef struct {
 #define START_BYTE1     0x5A
 #define START_BYTE2     0xA5
 #define DATA_LENGTH     9
-#define MAX_TORQUE_LEVEL    50
+#define MAX_TORQUE_LEVEL    100
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -108,6 +109,8 @@ typedef struct {
 /* Private variables ---------------------------------------------------------*/
 
 /* USER CODE BEGIN PV */
+volatile uint8_t ir_sensor_flag =0;
+
 static volatile bool is_motor_enabled = true;
 char uart_buf[100];  // UART 출력용 버퍼
 
@@ -126,16 +129,16 @@ static uint32_t timer_counter = 0;
 // CPM 파라미터 초기화
 static CPM_Params_t cpm_params = {
   .state = CPM_STATE_RUNNING,
-  .mode = CPM_PASSIVE,
+  .mode = CPM_ACTIVE,
   .active = {
     .speed = 1,       // 속도 초기값 (1~10)
-    .angle = 10,      // 각도 초기값 (10~120)
+    .angle = 1,      // 각도 초기값 (10~120)
     .repeat = 10,     // 반복 횟수 초기값 (1~100)
     .delay = 1
   },
   .passive = {
     .mode = PASSIVE_ASSIST,
-    .torque_level = 30
+    .torque_level = 10
   }
 };
 
@@ -194,6 +197,7 @@ int main(void)
   MX_TIM3_Init();
   MX_USART1_UART_Init();
   MX_USART6_UART_Init();
+  MX_TIM2_Init();
   /* USER CODE BEGIN 2 */
   // hmi
   HAL_UART_Receive_IT(&huart2, &rxData, 1);
@@ -218,24 +222,21 @@ int main(void)
     // 타이머 카운터 업데이트
     timer_counter = HAL_GetTick();
 
-
     
-    // 디버깅 목적으로 현재 엔코더 각도 출력 코드 (필요 시 주석 해제)
-    // float angle = Encoder_GetAngle();
-    // printf("Angle: %d\n", (int)angle);
-
+//-------------------------------------------------------------------------//
     switch (cpm_params.mode)
     {
       case CPM_IDLE:
-        // IDLE 상태에서는 아무 동작도 하지 않음
+        // IDLE 상태에서는 아무 동작도 하지 않음S
         break;
 //-------------------------------------------------------------------------//
+        //엔코더 값 범위 0 ~ 55 사용 소수점까지
       case CPM_ACTIVE:
         if (cpm_params.state == CPM_STATE_RUNNING)
         {
           char command[10];
           float current_angle = Encoder_GetAngle();
-          uint32_t delay = cpm_params.active.delay * 1000;  // uint32_t로 변경
+          uint32_t delay = cpm_params.active.delay * 1000;
 
           // 엔코더 각도 범위 처리 (0~360도)
           if (current_angle > 270 && current_angle <= 360)
@@ -244,28 +245,26 @@ int main(void)
             {current_angle = cpm_params.active.angle;}
 
           // HMI로부터 파라미터가 업데이트된 경우 새 동작을 시작
-          if (params_updated) {
-            // 모터 정지 후 새 파라미터로 재시작
-            RS485_SendCommand("ST");    // 모터 정지
-            HAL_Delay(200);
+            if (params_updated) {
+              // 모터 정지 후 새 파라미터로 재시작
+              RS485_SendCommand("ST");    // 모터 정지
+              HAL_Delay(200);
 
-            // 초기화 플래그 리셋하여 새 파라미터로 초기화
-            cpm_initialized = false;
-            params_updated = false;  // 업데이트 플래그 초기화
-          }
+              // 초기화 플래그 리셋하여 새 파라미터로 초기화
+              cpm_initialized = false;
+              params_updated = false;  // 업데이트 플래그 초기화
+            }
 
           // 초기 설정이 안 된 경우 초기화
           if (!cpm_initialized) {
             // 모터 초기화
             RS485_SendCommand("ME");    // 모터 활성화
-            HAL_Delay(500);             // 모터 활성화 대기
-
+            HAL_Delay(300);             // 모터 활성화 대기
             // 기본 파라미터 설정
             RS485_SendCommand("JA100");  // 가속도
             RS485_SendCommand("JL100");  // 감속도
-            RS485_SendCommand("JS10");   // 저크
+            RS485_SendCommand("JS0.01");   // 저크
             RS485_SendCommand("CJ");    // 조그 모드 설정 적용
-
             // 반복 카운터 초기화
             repeat_count = cpm_params.active.repeat;
             cpm_initialized = true;
@@ -293,7 +292,8 @@ int main(void)
             if (repeat_count <= 0) {
               // 모든 반복 완료
               RS485_SendCommand("ST");  // 정지
-              cpm_params.state = CPM_STATE_IDLE;
+              //cpm_params.state = CPM_STATE_IDLE;
+
               cpm_initialized = false;
             } else {
               // 다음 사이클 시작
@@ -315,45 +315,8 @@ int main(void)
         }
         else if(cpm_params.state == CPM_STATE_STOP)
         {
-          if(!stop)
-          {
-            // 처음 정지 명령을 받았을 때 일단 모터 멈춤
-            RS485_SendCommand("ST");
-            HAL_Delay(1000);
-
-            float current_angle = Encoder_GetAngle();
-
-            // 현재 위치가 이미 0도(±0.1 범위)면 바로 정지 완료
-            if (current_angle <= 0) {
-              moving_forward = true; // 기본값 설정
-              cpm_params.state = CPM_STATE_IDLE;
-            }
-            else {
-              // 0도가 아니면 무조건 0도 방향으로 이동하도록 설정
-              RS485_SendCommand("JS1");
-              RS485_SendCommand("CJ");    // 조그 모드 설정 적용
-
-              // 현재 각도가 0보다 크면 후진 방향으로 명령
-              if (current_angle > 0) {
-                RS485_SendCommand("CS-2");  // 0도 방향으로 천천히 이동
-                moving_forward = false;     // 후진 상태로 설정
-              }
-            }
-
-            stop = true;  // 초기화 완료 표시
-          }
-          else if (stop) {
-            // stop 플래그가 true일 때는 0도 도달만 체크
-            float current_angle = Encoder_GetAngle();
-
-            // 부동소수점 비교를 위해 작은 범위로 설정
-            if (current_angle <= 0) {
-              // 시작 위치(0도)에 도달, 정지 처리
-              RS485_SendCommand("ST");
-              moving_forward = true;  // 기본 상태로 복원
-              cpm_params.state = CPM_STATE_IDLE;
-            }
-          }
+          RS485_SendCommand("ST");
+          RS485_SendCommand("MD");
         }
         else if(cpm_params.state == CPM_STATE_EMERGENCY_STOP)
         {
@@ -364,30 +327,43 @@ int main(void)
         {
           RS485_SendCommand("ST");
         }
-//        break;
+        break;
 //-----------------------------------------------------------------------------------//
       case CPM_PASSIVE:
         if (cpm_params.state == CPM_STATE_RUNNING)
         {
           static uint32_t passive_loadcell_tick = 0;
+          static bool cs_command_sent_CW = false;    // CS 명령 전송 상태 추적 플래그
+          static bool cs_command_sent_CCW = false;   // 반대 방향용 플래그
+          static bool st_command_sent = false;       // ST 명령 전송 상태 추적 플래그 추가
+
           if(timer_counter - passive_loadcell_tick >= 50)
           {
-            int weight = HX711_GetWeight();
-            printf("%d\r\n",weight);
+            float weight = HX711_GetGrams();
+            printf("%d\r\n",(int)weight);
 
             // 초기화 체크
             if (!cpm_initialized)
             {
               // 모터 초기화 코드
-            	RS485_SendCommand("ME");
-            	RS485_SendCommand("CM1");
+//              RS485_SendCommand("ME");
+//              RS485_SendCommand("JA100");
+//              RS485_SendCommand("JD100");
+//              RS485_SendCommand("JS5");
+//              RS485_SendCommand("CJ");
+
+              RS485_SendCommand("ME");
+
+
               cpm_initialized = true;
             }
 
-            // 데드존 체크 (-100g ~ +100g 무시)
-            if (abs(weight) > 100)
+            // 데드존 체크 (-500g ~ +500g 무시)
+            if (abs(weight) > 1000)
             {
-              // 토크 제한 적용
+              // 데드존을 벗어났으므로 ST 명령 플래그 초기화
+              st_command_sent = false;
+
               uint8_t limited_torque = (cpm_params.passive.torque_level > MAX_TORQUE_LEVEL) ?
                                       MAX_TORQUE_LEVEL : cpm_params.passive.torque_level;
               char torque_cmd[10];
@@ -395,39 +371,72 @@ int main(void)
               switch(cpm_params.passive.mode)
               {
               case PASSIVE_ASSIST:  // 서포트 모드
-                if (weight > 100)  // 미는 힘
+                if (weight > 1000)  // 미는 힘
                 {
-                  sprintf(torque_cmd, "GC-%d", limited_torque);
-                  RS485_SendCommand(torque_cmd);  // 양의 토크로 도와줌
+                  if (!cs_command_sent_CW)  // 아직 명령이 전송되지 않았을 때만 실행
+                  {
+                      RS485_SendCommand("CJ");
+                      sprintf(torque_cmd, "CS-%d", limited_torque);
+//                      sprintf(torque_cmd, "GC-%d", limited_torque);
+                      RS485_SendCommand(torque_cmd);  // 양의 토크로 도와줌
+                      cs_command_sent_CW = true;      // 명령 전송 플래그 설정
+                      cs_command_sent_CCW = false;    // 반대 방향 초기화
+                  }
                 }
-                else if (weight < -100)  // 당기는 힘
+                else if (weight < -1000)  // 당기는 힘
                 {
-                  sprintf(torque_cmd, "GC%d", limited_torque);
-                  RS485_SendCommand(torque_cmd);  // 음의 토크로 도와줌
-                }
-                break;
-
-              case PASSIVE_RESIST:  // 저항 모드
-                if (weight > 100)  // 미는 힘
-                {
-                  sprintf(torque_cmd, "GC%d", limited_torque);
-                  RS485_SendCommand(torque_cmd);  // 음의 토크로 저항
-                }
-                else if (weight < -100)  // 당기는 힘
-                {
-                  sprintf(torque_cmd, "GC-%d", limited_torque);
-                  RS485_SendCommand(torque_cmd);  // 양의 토크로 저항
+                  if (!cs_command_sent_CCW)  // 아직 명령이 전송되지 않았을 때만 실행
+                  {
+                     RS485_SendCommand("CJ");
+                      sprintf(torque_cmd, "CS%d", limited_torque);
+//                      sprintf(torque_cmd, "GC%d", limited_torque);
+                      RS485_SendCommand(torque_cmd);  // 음의 토크로 도와줌
+                      cs_command_sent_CCW = true;     // 명령 전송 플래그 설정
+                      cs_command_sent_CW = false;     // 반대 방향 초기화
+                  }
                 }
                 break;
               }
             }
-            else  // 데드존 내의 힘
+
+
+            else  // 데드존 내의 힘 (500 이하)
             {
-              RS485_SendCommand("GC0");  // 토크 0
+              // ST 명령이 아직 전송되지 않았을 때만 실행
+              if (!st_command_sent)
+              {
+                RS485_SendCommand("ST");  // 토크 0 (한 번만 실행)
+                RS485_SendCommand("ST");  // 토크 0 (한 번만 실행)
+//                RS485_SendCommand("GC0");
+                st_command_sent = true;   // ST 명령 전송 플래그 설정
+
+                // CS 명령 플래그 초기화 - 다시 500 이상이 되면 명령을 보낼 수 있게 함
+                cs_command_sent_CW = false;
+                cs_command_sent_CCW = false;
+              }
             }
 
             passive_loadcell_tick = timer_counter;
           }
+
+        }
+
+        else if(cpm_params.state == CPM_STATE_PAUSED)
+        {
+          RS485_SendCommand("ST");
+
+
+        }
+        else if(cpm_params.state == CPM_STATE_STOP)
+        {
+          RS485_SendCommand("ST");
+
+        }
+        else if(cpm_params.state == CPM_STATE_EMERGENCY_STOP)
+        {
+          RS485_SendCommand("ST");
+          RS485_SendCommand("MD");
+
         }
         break;
  //-------------------------------------------------------------------------//
@@ -539,8 +548,8 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
               // 실행 중에는 값만 저장하고 업데이트 플래그는 설정하지 않음
               break;
 
-            case 0x1001:  // 각도 (10-120)
-              cpm_params.active.angle = protocolData.data2;
+            case 0x1001:  // 각도 (1-10)
+              cpm_params.active.angle = protocolData.data2 * 5.5;
               // 실행 중에는 값만 저장하고 업데이트 플래그는 설정하지 않음
               break;
 
@@ -556,7 +565,7 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
 
             case 0x1100:
               // 패시브 모드 토크 레벨 설정
-              cpm_params.passive.torque_level = protocolData.data2;
+              cpm_params.passive.torque_level = 10 + ((protocolData.data2 - 1) * 2);
               break;
 
             case 0x3000:
@@ -602,7 +611,7 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
 
                 case 0x03:  // 정지
                   cpm_params.state = CPM_STATE_STOP;
-                  stop = false;
+
                   break;
 
                 case 0x04:  // 0점(초기화)
@@ -618,13 +627,14 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
                   cpm_params.passive.mode = PASSIVE_ASSIST;
                   break;
                   
-                case 0x07:  // 저항모드
+                case 0x07:  // 저항모드 not used
                   cpm_params.mode = CPM_PASSIVE;
                   cpm_params.passive.mode = PASSIVE_RESIST;
                   break;
                   
-                case 0x08:  // 비례모드 (힘 측정 모드로 처리)
-                  cpm_params.mode = CPM_FORCE_MEASURE;
+                case 0x08:  // 비례모드
+                  cpm_params.mode = CPM_PASSIVE;
+                  cpm_params.passive.mode = PASSIVE_PROPORTIONAL;
                   break;
               }
               break;
@@ -634,10 +644,12 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
               {
                 case 0x01:  // 액티브 모드
                   cpm_params.mode = CPM_ACTIVE;
+                  cpm_initialized = false;
                   break;
 
                 case 0x02:  // 패시브 모드
                   cpm_params.mode = CPM_PASSIVE;
+                  cpm_initialized = false;
                   break;
 
                 case 0x03:  // 힘측정 모드
@@ -655,21 +667,6 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
   }
 }
 
-// limit sensor
-void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
-{
-  if (GPIO_Pin == start_limit_Pin)
-  {
-
-    RS485_MotorDisable(); // 안전을 위해 모터도 정지
-  }
-
-  if (GPIO_Pin == end_limit_Pin)
-  {
-    // 끝 위치 감지: 모터만 정지
-    RS485_MotorDisable();
-  }
-}
 /* USER CODE END 4 */
 
 /**

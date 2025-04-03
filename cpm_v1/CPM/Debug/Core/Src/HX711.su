@@ -4,3 +4,4 @@
 ../Core/Src/HX711.c:64:7:HX711_GetUnits	32	static
 ../Core/Src/HX711.c:76:6:HX711_Tare	16	static
 ../Core/Src/HX711.c:88:5:HX711_GetWeight	16	static
+../Core/Src/HX711.c:98:7:HX711_GetGrams	16	static
